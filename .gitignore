@@ -1,0 +1,20 @@
+# Python environment artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Databases and Local vector directories (Persisted locally only)
+data/
+.chroma_test/
+.embeddings_cache/
+
+# Environment configurations containing keys/secrets
+.env
+
+# Streamlit configurations
+.streamlit/
+
+# OS specific files
+.DS_Store
+Thumbs.db
