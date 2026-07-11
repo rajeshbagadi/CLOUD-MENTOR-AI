@@ -4,6 +4,7 @@ import tempfile
 from unittest.mock import MagicMock, patch
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_core.messages import AIMessage
 
 from src.vectorstore.vector_store import ChromaStoreManager
 from src.rag.retriever import SemanticRetriever
@@ -45,9 +46,11 @@ def test_rag_pipeline_execution():
         
         # Mock Gemini Manager
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = MagicMock(
+        mock_message = AIMessage(
             content="AWS EC2 provides compute resource virtualization [source: ec2_doc.pdf, page: 1]."
         )
+        mock_llm.invoke.return_value = mock_message
+        mock_llm.return_value = mock_message
         
         mock_gemini = MagicMock(spec=GeminiClientManager)
         mock_gemini.get_llm.return_value = mock_llm
@@ -66,5 +69,20 @@ def test_rag_pipeline_execution():
         assert response.source_chunks[0].page == 1
         
     finally:
-        # Tear down directories
-        shutil.rmtree(temp_dir)
+        # Close database connection to release files on Windows
+        if 'db_mgr' in locals() and db_mgr._db is not None:
+            if hasattr(db_mgr._db, "_client") and hasattr(db_mgr._db._client, "close"):
+                db_mgr._db._client.close()
+        if 'db_mgr' in locals():
+            del db_mgr
+        import gc; gc.collect()
+        
+        # Retry deletion to avoid Windows file system locking race conditions
+        import time
+        for idx in range(5):
+            try:
+                shutil.rmtree(temp_dir)
+                break
+            except Exception:
+                time.sleep(0.2 * (idx + 1))
+

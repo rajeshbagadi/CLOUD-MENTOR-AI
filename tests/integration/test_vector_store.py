@@ -12,11 +12,27 @@ class MockEmbeddings(Embeddings):
     """Fake embedding model to speed up tests without downloading models."""
 
     def embed_documents(self, texts):
-        # MiniLM-L6-v2 uses 384 dimensions
-        return [[0.1] * 384 for _ in texts]
+        embeddings = []
+        for text in texts:
+            emb = [0.0] * 384
+            if any(kw in text.lower() for kw in ["ec2", "virtual server", "compute"]):
+                emb[0] = 1.0
+            elif any(kw in text.lower() for kw in ["s3", "storage", "serverless"]):
+                emb[1] = 1.0
+            else:
+                emb[2] = 1.0
+            embeddings.append(emb)
+        return embeddings
 
     def embed_query(self, text):
-        return [0.1] * 384
+        emb = [0.0] * 384
+        if any(kw in text.lower() for kw in ["ec2", "virtual server", "compute"]):
+            emb[0] = 1.0
+        elif any(kw in text.lower() for kw in ["s3", "storage", "serverless"]):
+            emb[1] = 1.0
+        else:
+            emb[2] = 1.0
+        return emb
 
 
 def test_chromadb_lifecycle():
@@ -63,5 +79,20 @@ def test_chromadb_lifecycle():
         assert results_after[0].metadata["source"] != "ec2.pdf"
         
     finally:
-        # Tear down temporary workspace
-        shutil.rmtree(temp_dir)
+        # Close database connection to release files on Windows
+        if 'db_mgr' in locals() and db_mgr._db is not None:
+            if hasattr(db_mgr._db, "_client") and hasattr(db_mgr._db._client, "close"):
+                db_mgr._db._client.close()
+        if 'db_mgr' in locals():
+            del db_mgr
+        import gc; gc.collect()
+        
+        # Retry deletion to avoid Windows file system locking race conditions
+        import time
+        for idx in range(5):
+            try:
+                shutil.rmtree(temp_dir)
+                break
+            except Exception:
+                time.sleep(0.2 * (idx + 1))
+

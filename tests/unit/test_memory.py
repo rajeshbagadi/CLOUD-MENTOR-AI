@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
+from langchain_core.messages import AIMessage
 from src.rag.chat_memory import ChatMemoryManager
 
 
@@ -24,12 +25,13 @@ def test_memory_history_truncation():
     assert history[-1]["content"] == "Response 2"
 
 
-@patch("src.rag.chat_memory.ChatPromptTemplate")
-def test_question_condensation(mock_prompt, monkeypatch):
+def test_question_condensation():
     """Verify condense_question rephrases follow-up questions containing referencing terms."""
     mock_llm = MagicMock()
-    mock_llm.invoke.return_value = MagicMock(content="What are firewalls for AWS EC2 instances?")
-    
+    mock_message = AIMessage(content="What are firewalls for AWS EC2 instances?")
+    mock_llm.invoke.return_value = mock_message
+    mock_llm.return_value = mock_message
+
     # Mock GeminiManager to return our mock LLM
     mock_gemini = MagicMock()
     mock_gemini.get_llm.return_value = mock_llm
@@ -46,3 +48,5 @@ def test_question_condensation(mock_prompt, monkeypatch):
     
     # Verify result rephrase output matches our mock response
     assert standalone == "What are firewalls for AWS EC2 instances?"
+
+
